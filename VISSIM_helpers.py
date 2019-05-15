@@ -1,6 +1,7 @@
 import igraph
 import win32com.client as com
 import pandas as pd
+import itertools
 
 
 class VissimRoadNet(igraph.Graph):
@@ -17,6 +18,7 @@ class VissimRoadNet(igraph.Graph):
         :param kwargs:
         """
         super(VissimRoadNet, self).__init__(directed=True, *args, **kwargs)
+        assert type(vissim_net).__name__ == "INet"
         self.net = net
         self.visedges = self.vissim_net_to_igraph(self.net)
 
@@ -26,7 +28,6 @@ class VissimRoadNet(igraph.Graph):
         :param vissim_net: win32com.gen_py.[VISSIM COM GUID].INet
         :return:
         """
-        assert type(vissim_net).__name__ == "INet"
 
         # read edges into dataframe
         all_edges = pd.DataFrame(
@@ -57,33 +58,49 @@ class VissimRoadNet(igraph.Graph):
                 # create and add origin vertex to graph
                 vertex_name = 'visnode.' + str(all_edges.loc[index].FromNode) + '.' + str(index)
                 self.add_vertex(name=vertex_name)
-                all_edges.loc[index, 'OriginVertex'] = vertex_name
 
-            # add this edge's origin vertex as DestinVertex of all edges going into it
-            from_edges = all_edges.loc[index].FromEdges
-            if from_edges:
-                from_edges = [int(ed) for ed in from_edges.split(',')]
-                all_edges.loc[from_edges, 'DestinVertex'] = all_edges.loc[index, 'OriginVertex']
-                # TODO add the vertex to the OriginVertex of other edges going to the same edges
+                # add this edge's origin vertex as DestinVertex of all edges going into it
+                vertex_enter_edges = all_edges.loc[index].FromEdges
+                if vertex_enter_edges:
+                    vertex_enter_edges = [int(ed) for ed in vertex_enter_edges.split(',')]
+                    all_edges.loc[vertex_enter_edges, 'DestinVertex'] = vertex_name
+                    # add the vertex to the OriginVertex of other edges going to the same edges
+                    vertex_exit_edges = [ed.split(',') for ed in all_edges.loc[vertex_enter_edges].ToEdges]
+                    vertex_exit_edges = [int(ed) for ed in itertools.chain.from_iterable(vertex_exit_edges)]
+                    all_edges.loc[vertex_exit_edges, 'OriginVertex'] = vertex_name
+                else:  # add vertex to all edges going directly to and from node
+                    from_node = all_edges.loc[index].FromNode
+                    all_edges.loc[(all_edges['FromNode'] == from_node) & (all_edges['FromEdges'] == ""),
+                    'OriginVertex'] = vertex_name
+                    all_edges.loc[(all_edges['ToNode'] == from_node) & (all_edges['ToEdges'] == ""),
+                    'DestinVertex'] = vertex_name
 
             if not all_edges.loc[index].DestinVertex:  # fresh edge that doesn't have destination vertices assigned
                 # create and add destination vertex to graph
                 vertex_name = 'visnode.' + str(all_edges.loc[index].ToNode) + '.' + str(index)
                 self.add_vertex(name=vertex_name)
-                all_edges.loc[index, 'DestinVertex'] = vertex_name
 
-            # add this edge's destination vertex as OriginVertex of all edges going from it
-            to_edges = all_edges.loc[index].ToEdges
-            if to_edges:
-                to_edges = [int(ed) for ed in to_edges.split(',')]
-                all_edges.loc[to_edges, 'OriginVertex'] = all_edges.loc[index, 'DestinVertex']
-                # TODO add the vertex to the DestinVertex of other edges coming from the same edges
+                # add this edge's destination vertex as OriginVertex of all edges going from it
+                vertex_exit_edges = all_edges.loc[index].ToEdges
+                if vertex_exit_edges:
+                    vertex_exit_edges = [int(ed) for ed in vertex_exit_edges.split(',')]
+                    all_edges.loc[vertex_exit_edges, 'OriginVertex'] = vertex_name
+                    # add the vertex to the DestinVertex of other edges coming from the same edges
+                    vertex_enter_edges = [ed.split(',') for ed in all_edges.loc[vertex_exit_edges].FromEdges]
+                    vertex_enter_edges = [int(ed) for ed in itertools.chain.from_iterable(vertex_enter_edges)]
+                    all_edges.loc[vertex_enter_edges, 'DestinVertex'] = vertex_name
+                else:  # add vertex to all edges going directly to and from node
+                    to_node = all_edges.loc[index].ToNode
+                    all_edges.loc[(all_edges['FromNode'] == to_node) & (all_edges['FromEdges'] == ""),
+                    'OriginVertex'] = vertex_name
+                    all_edges.loc[(all_edges['ToNode'] == to_node) & (all_edges['ToEdges'] == ""),
+                    'DestinVertex'] = vertex_name
 
             # add this edge to the graph
-            if not all_edges.loc[index, 'Closed']:
-                self.add_edge(all_edges.loc[index, 'OriginVertex'],
-                              all_edges.loc[index, 'DestinVertex'],
-                              name="visedge." + str(index))
+            # if not all_edges.loc[index, 'Closed']: # TODO apply closed status during edge cost analysis
+            self.add_edge(all_edges.loc[index, 'OriginVertex'],
+                          all_edges.loc[index, 'DestinVertex'],
+                          name="visedge." + str(index))
 
         return all_edges
 
@@ -94,6 +111,7 @@ if __name__ == "__main__":
     from win32com.client import constants as c
 
     FileName = r"C:\Users\Public\Documents\PTV Vision\PTV Vissim 9\Examples Demo\Urban Freeway Dyn Assign Redmond.US\I405 OD"
+    # FileName = r"E:\Thesis\Inital test network"
     Vissim.LoadNet(FileName + ".inpx")
     Net = Vissim.Net
     if not Net.DynamicAssignment.CreateGraph(c.CGEdgeTypeDynamicAssignment):
