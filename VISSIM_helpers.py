@@ -8,7 +8,7 @@ class VissimRoadNet(igraph.Graph):
     """
     This class extends the igraph Graph object to allow connection with a VISSIM
     """
-    VISSIM_Edge_Attributes = ['No', 'FromNode', 'ToNode', 'FromEdges', 'ToEdges', 'IsTurn', 'Type', 'Closed']
+    VISSIM_Edge_Attributes = ['No', 'FromNode', 'ToNode', 'FromEdges', 'ToEdges', 'LinkSeq', 'IsTurn', 'Type', 'Closed']
 
     def __init__(self, net, *args, **kwargs):
         """
