@@ -18,7 +18,7 @@ class VissimRoadNet(igraph.Graph):
         :param kwargs:
         """
         super(VissimRoadNet, self).__init__(directed=True, *args, **kwargs)
-        assert type(vissim_net).__name__ == "INet"
+        assert type(net).__name__ == "INet"
         self.net = net
         self.visedges = self.vissim_net_to_igraph(self.net)
 
@@ -119,5 +119,5 @@ if __name__ == "__main__":
         exit(1)
 
     road_graph = VissimRoadNet(Net)
-    road_graph.write_svg(r"E:\Thesis\test.svg")
+    road_graph.write_svg(r"E:\Thesis\test.svg", width=3000, height=3000)
     Vissim.Exit()
