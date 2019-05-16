@@ -3,6 +3,8 @@ import win32com.client as com
 import pandas as pd
 import itertools
 
+def read_edges_to_df(visnet):
+    pass
 
 class VissimRoadNet(igraph.Graph):
     """
@@ -50,7 +52,7 @@ class VissimRoadNet(igraph.Graph):
         all_edges['OriginVertex'] = ""
         all_edges['DestinVertex'] = ""
         # use edge numbers as index
-        all_edges.set_index('No', inplace=True, verify_integrity=True, drop=False)
+        all_edges.set_index('No', inplace=True, verify_integrity=True, drop=True)
 
         # read each edge into graph, build vertices as we go
         for index in all_edges.index:
