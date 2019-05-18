@@ -121,5 +121,5 @@ if __name__ == "__main__":
         exit(1)
 
     road_graph = VissimRoadNet(Net)
-    road_graph.write_svg(r"E:\Thesis\test.svg", width=3000, height=3000)
+    road_graph.write_svg(r"J:\Thesis\test.svg", width=3000, height=3000)
     Vissim.Exit()
