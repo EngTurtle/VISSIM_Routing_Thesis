@@ -12,12 +12,13 @@ The results of this research will help predict the effect of ride sharing and au
 
 ## References
 
-| [1] | Daedal Research, "Global Ride-Sharing Market: Size, Trends & Forecast (2018-2022)," Research and Markets, Global, 2018.|
-| [2] | Catapult Transport Systems, "Market Forecast for Connected and Autonomous Vehicles," Government of United Kingdom, 2017.|
+|  |  |
+|-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [1] | Daedal Research, "Global Ride-Sharing Market: Size, Trends & Forecast (2018-2022)," Research and Markets, Global, 2018. |
+| [2] | Catapult Transport Systems, "Market Forecast for Connected and Autonomous Vehicles," Government of United Kingdom, 2017. |
 | [3] | J. G. Wardrop, "Some theoretical aspects of road traffic research.," Inst Civil Engineers Proc London/UK/, pp. Part Ii, VoL 1, 2, PP 325-378, 1952. |
-| [4] | P. D. Site, "A mixed-behaviour equilibrium model under predictive and static Advanced Traveller Information Systems (ATIS) and state-dependent route choice," Transportation Research Part C-emerging Technologies, vol. 86, no. , pp. 549-562, 2018. |
-| [5] | L. . Du, L. . Han and S. . Chen, "Coordinated online in-vehicle routing balancing user optimality and system optimality through information perturbation," Transportation Research Part B-methodological, vol. 79, no. , pp. 121-133, 2015. | 
-| [6] | SAE International, Taxonomy and Definitions for Terms Related to Driving Automation Systems for On-Road Motor Vehicles, SAE International, 2018. |
-| [7] | H. . Yang and Q. . Meng, "Departure time, route choice and congestion toll in a queuing network with elastic demand," Transportation Research Part B-methodological, vol. 32, no. 4, pp. 247-260, 1998. | 
-
+| [4] | P. D. Site, "A mixed-behaviour equilibrium model under predictive and static Advanced Traveller Information Systems (ATIS) and state-dependent route choice," Transportation Research Part C-emerging Technologies, vol. 86, no. , pp. 549-562, 2018.  |
+| [5] | L. . Du, L. . Han and S. . Chen, "Coordinated online in-vehicle routing balancing user optimality and system optimality through information perturbation," Transportation Research Part B-methodological, vol. 79, no. , pp. 121-133, 2015.  |
+| [6] | SAE International, Taxonomy and Definitions for Terms Related to Driving Automation Systems for On-Road Motor Vehicles, SAE International, 2018.  |
+| [7] | H. . Yang and Q. . Meng, "Departure time, route choice and congestion toll in a queuing network with elastic demand," Transportation Research Part B-methodological, vol. 32, no. 4, pp. 247-260, 1998.  |
 
