@@ -31,7 +31,7 @@ def dynamic_assignment_file_read(file: [str, TextIOWrapper]) -> Mapping[str, pd.
     This function reads a VISSIM dynamic assignment file with extension bew or weg and converts all the contained tables
     to dataframes
     :param file: either a str path to the file or a file wrapper it self.
-    :return: a dictionary of dataframes referenced by their table name from VISSIM file
+    :return: a dictionary of dataframes referenced by their table content from VISSIM file
     """
     fileIO: TextIOWrapper
     if type(file) is str:
@@ -65,7 +65,7 @@ def dynamic_assignment_file_read(file: [str, TextIOWrapper]) -> Mapping[str, pd.
         split_line = line.strip().strip('\n').split(';')
         if str.isdigit(split_line[0]) and current_table in output_dict:
             split_line = [tonumeric(value) for value in split_line]
-            output_dict[current_table] = output_dict[current_table]\
+            output_dict[current_table] = output_dict[current_table] \
                 .append(dict(zip(attributes, split_line)), ignore_index=True)
 
     if type(file) is str:
@@ -76,6 +76,6 @@ def dynamic_assignment_file_read(file: [str, TextIOWrapper]) -> Mapping[str, pd.
 
 # gather list of route files
 if __name__ == "__main__":
-    file = r"D:\Users\ollie\OneDrive\Documents\University Documents\Thesis\Single OD Test\routing_020.bew"
+    file = r"D:\Users\ollie\OneDrive\Documents\University Documents\Thesis\Single OD Test\routing_019.bew"
     tables = dynamic_assignment_file_read(file)
     pass
