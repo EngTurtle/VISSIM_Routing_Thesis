@@ -3,8 +3,10 @@ import win32com.client as com
 import pandas as pd
 import itertools
 
+
 def read_edges_to_df(visnet):
     pass
+
 
 class VissimRoadNet(igraph.Graph):
     """
