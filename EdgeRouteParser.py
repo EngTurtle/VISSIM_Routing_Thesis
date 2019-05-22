@@ -1,10 +1,14 @@
 from io import TextIOWrapper
 from typing import Mapping, Sequence
-
+from os import path, walk, getenv
 import pandas as pd
+import ntpath
+import multiprocessing as mp
 
 TABLENAMES = {'bew': ["DynAsnAttr", "EdgeAttr", "EdgeVolTime"],
               'weg': ["DynAsnAttr", "EdgeAttr", "PathVolTime"]}
+
+ONEDRIVEPATH = getenv('OneDriveConsumer', default=r"C:\Users\ITSLab")
 
 
 def tonumeric(instr: str) -> [int, float, str]:
@@ -74,8 +78,38 @@ def dynamic_assignment_file_read(file: [str, TextIOWrapper]) -> Mapping[str, pd.
     return output_dict
 
 
+def files_by_ext(parent_dir: str, ext: str) -> Sequence[str]:
+    """
+    This function finds all files with the provided extension under the provided parent_dir
+    :param parent_dir: a folder string path to search
+    :param ext: a file extension
+    :return: a list of full string paths
+    """
+    parent_dir = parent_dir.strip('"').strip("'")
+    if not path.isdir(parent_dir):
+        raise ValueError("\"{}\" is not a valid directory".format(parent_dir))
+
+    ext = ext.split('.')[-1]
+    if not ext:
+        raise ValueError(ext + " is not a valid extension to search")
+
+    file_paths = []
+    for root, directories, files in walk(parent_dir):
+        for file in files:
+            if file.endswith('.' + ext):
+                file_paths.append(path.join(root, file))
+
+    return file_paths
+
+
+def read_tables_mp(files: Sequence[str]):
+    with mp.Pool() as pool:
+        return pool.map(dynamic_assignment_file_read, files)
+
+
 # gather list of route files
 if __name__ == "__main__":
-    file = r"D:\Users\ollie\OneDrive\Documents\University Documents\Thesis\Single OD Test\routing_019.bew"
-    tables = dynamic_assignment_file_read(file)
-    pass
+    files = files_by_ext(path.join(ONEDRIVEPATH, r"Documents\University Documents\Thesis\Urban Freeway Dyn Assign Redmond.US"),
+                 'bew')
+
+    tables = read_tables_mp(files)
