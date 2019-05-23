@@ -49,5 +49,8 @@ if __name__ == "__main__":
                                               lambda tbd: tbd['VolTime'],
                                               timevol_table
                                               ), files)
+    sim_itr = [int(path.basename(fr).split('.')[0].split('_')[-1]) for fr in files]
+    for itr, table in zip(sim_itr, tables):
+        table['ITR'] = itr
 
     end_table = pd.concat(tables)
