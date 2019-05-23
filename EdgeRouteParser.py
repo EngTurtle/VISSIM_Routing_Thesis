@@ -1,7 +1,8 @@
 from typing import Sequence
 from os import path, walk, getenv
 import pathos.multiprocessing as mp
-from DynFileFuncs import dynamic_assignment_file_read, TABLENAMES
+from DynFileFuncs import dynamic_assignment_file_read, timevol_table
+import pandas as pd
 
 ONEDRIVEPATH = getenv('OneDriveConsumer', default=r"C:\Users\ITSLab")
 
@@ -44,4 +45,9 @@ if __name__ == "__main__":
                  'bew')
 
     with mp.Pool() as pool:
-        tables = pool.map(functions_expansion(dynamic_assignment_file_read), files)
+        tables = pool.map(functions_expansion(dynamic_assignment_file_read,
+                                              lambda tbd: tbd['VolTime'],
+                                              timevol_table
+                                              ), files)
+
+    end_table = pd.concat(tables)
