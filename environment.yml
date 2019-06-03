@@ -1,0 +1,25 @@
+name: thesis
+channels:
+  - defaults
+  - conda-forge
+  - vtraag
+dependencies:
+  - anaconda
+  - cairo
+  - ipywidgets
+  - jupyter_nbextensions_configurator
+  - jupyterlab
+  - jupyterlab-git
+  - jupyterlab_code_formatter
+  - matplotlib
+  - nodejs
+  - pathos
+  - pip
+  - pycairo
+  - python=3.7.*
+  - python-igraph=0.7.*
+  - pywin32
+  - qgrid
+  - pip:
+    - cufflinks
+    - plotly

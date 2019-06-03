@@ -12,7 +12,8 @@ class VissimRoadNet(igraph.Graph):
     """
     This class extends the igraph Graph object to allow connection with a VISSIM
     """
-    VISSIM_Edge_Attributes = ['No', 'FromNode', 'ToNode', 'FromEdges', 'ToEdges', 'LinkSeq', 'Length', 'IsTurn', 'Type', 'Closed']
+    VISSIM_Edge_Attributes = ['No', 'FromNode', 'ToNode', 'FromEdges', 'ToEdges', 'LinkSeq', 'Length', 'IsTurn', 'Type',
+                              'Closed']
 
     def __init__(self, net, *args, **kwargs):
         """
@@ -30,7 +31,6 @@ class VissimRoadNet(igraph.Graph):
         """
         This function takes in a VISSIM network COM object, then reads it and converts it to a VissimRoadNet object
         :param vissim_net: win32com.gen_py.[VISSIM COM GUID].INet
-        :return:
         """
 
         # read edges into dataframe
@@ -75,9 +75,9 @@ class VissimRoadNet(igraph.Graph):
                 else:  # add vertex to all edges going directly to and from node
                     from_node = all_edges.loc[index].FromNode
                     all_edges.loc[(all_edges['FromNode'] == from_node) & (all_edges['FromEdges'] == ""),
-                    'OriginVertex'] = vertex_name
+                                  'OriginVertex'] = vertex_name
                     all_edges.loc[(all_edges['ToNode'] == from_node) & (all_edges['ToEdges'] == ""),
-                    'DestinVertex'] = vertex_name
+                                  'DestinVertex'] = vertex_name
 
             if not all_edges.loc[index].DestinVertex:  # fresh edge that doesn't have destination vertices assigned
                 # create and add destination vertex to graph
@@ -96,9 +96,9 @@ class VissimRoadNet(igraph.Graph):
                 else:  # add vertex to all edges going directly to and from node
                     to_node = all_edges.loc[index].ToNode
                     all_edges.loc[(all_edges['FromNode'] == to_node) & (all_edges['FromEdges'] == ""),
-                    'OriginVertex'] = vertex_name
+                                  'OriginVertex'] = vertex_name
                     all_edges.loc[(all_edges['ToNode'] == to_node) & (all_edges['ToEdges'] == ""),
-                    'DestinVertex'] = vertex_name
+                                  'DestinVertex'] = vertex_name
 
             # add this edge to the graph
             # if not all_edges.loc[index, 'Closed']: # TODO apply closed status during edge cost analysis
