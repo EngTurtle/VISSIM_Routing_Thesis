@@ -5,13 +5,16 @@ channels:
   - vtraag
 dependencies:
   - anaconda
-  - cairo
+  - autopep8c
   - ipywidgets
   - jupyter_nbextensions_configurator
+  - jupyter_contrib_nbextensions
+  - jupyter_conda
   - jupyterlab
   - jupyterlab-git
   - jupyterlab_code_formatter
   - matplotlib
+  - miktex
   - nodejs
   - pathos
   - pip
