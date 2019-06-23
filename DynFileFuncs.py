@@ -118,7 +118,10 @@ def dynamic_assignment_file_read(file: [str, TextIOWrapper]) -> Dict[str, pd.Dat
     # cast each column to the correct type
     for frame in output_dict.values():
         for col in frame.columns.values:
-            frame[col] = frame[col].astype(colu_to_type(col))
+            coltype = colu_to_type(col)
+            if coltype is int:
+                frame[col] = frame[col].fillna(0)
+            frame[col] = frame[col].astype(coltype)
 
     if type(file) is str:
         fileIO.close()

@@ -4,9 +4,6 @@ import pathos.multiprocessing as mp
 from DynFileFuncs import dynamic_assignment_file_read, timevol_table
 import pandas as pd
 
-ONEDRIVEPATH = getenv('OneDriveConsumer', default=r"C:\Users\ITSLab")
-
-
 def files_by_ext(parent_dir: str, ext: str) -> Sequence[str]:
     """
     This function finds all files with the provided extension under the provided parent_dir
@@ -41,16 +38,24 @@ def functions_expansion(*args):
 
 # gather list of route files
 if __name__ == "__main__":
-    files = files_by_ext(path.join(ONEDRIVEPATH, r"Documents\University Documents\Thesis\Urban Freeway Dyn Assign Redmond.US"),
-                 'bew')
+    def read_edge_vol_delay(in_files: Sequence[str]) -> pd.DataFrame:
+        with mp.Pool() as pool:
+            tables = pool.map(functions_expansion(dynamic_assignment_file_read,
+                                                  lambda tbd: tbd['VolTime'],
+                                                  timevol_table
+                                                  ), in_files)
 
-    with mp.Pool() as pool:
-        tables = pool.map(functions_expansion(dynamic_assignment_file_read,
-                                              lambda tbd: tbd['VolTime'],
-                                              timevol_table
-                                              ), files)
-    sim_itr = [int(path.basename(fr).split('.')[0].split('_')[-1]) for fr in files]
-    for itr, table in zip(sim_itr, tables):
-        table['ITR'] = itr
+        sim_itr = [int(path.basename(fr).split('.')[0].split('_')[-1]) for fr in in_files]
+        for itr, table in zip(sim_itr, tables):
+            table['ITR'] = itr
 
-    end_table = pd.concat(tables)
+        sim_dem = [float(path.split(path.split(fr)[0])[-1].replace('Vol','').replace('per','')) / 100 for fr in in_files]
+        for dem, table in zip(sim_dem, tables):
+            table['Demand'] = dem
+
+        return pd.concat(tables)
+    
+    files = files_by_ext(path.abspath(r"..\Urban Freeway Dyn Assign Redmond.US"), 'bew')
+    files = [file for file in files if '_' in path.split(file)[-1]]
+    funcs = functions_expansion(dynamic_assignment_file_read, lambda tbd: tbd['VolTime'], timevol_table)
+    edge_volume_time = read_edge_vol_delay(files)
