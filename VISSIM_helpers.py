@@ -24,37 +24,18 @@ class VissimRoadNet(igraph.Graph):
         """
         super(VissimRoadNet, self).__init__(directed=True, *args, **kwargs)
         assert type(net).__name__ == "INet"
-        self.net = net
-        self.visedges = self.vissim_net_to_igraph(self.net)
+        self.visedges = self.read_vissim_net(net)
+        self.vissim_net_to_igraph()
+        self.parking_lots = self.read_parking_lot(net)
+        # TODO get parking lot association to nodes
 
-    def vissim_net_to_igraph(self, vissim_net):
+    def vissim_net_to_igraph(self):
         """
         This function takes in a VISSIM network COM object, then reads it and converts it to a VissimRoadNet object
         :param vissim_net: win32com.gen_py.[VISSIM COM GUID].INet
         """
 
-        # read edges into dataframe
-        all_edges = pd.DataFrame(
-            [list(row) for row in vissim_net.Edges.GetMultipleAttributes(self.VISSIM_Edge_Attributes)],
-            columns=self.VISSIM_Edge_Attributes
-        )
-        # filter only open dynamic assignment edges
-        all_edges = all_edges[all_edges.Type == 'DYNAMICASSIGNMENT']
-        # properly type cast all the columns
-        all_edges.No = all_edges.No.astype('int32')
-        all_edges.FromNode = all_edges.FromNode.astype('int32')
-        all_edges.ToNode = all_edges.ToNode.astype('int32')
-        all_edges.astype({
-            'FromEdges': str,
-            'ToEdges': str,
-            'IsTurn': bool,
-            'Type': 'category',
-            'Closed': bool
-        }, copy=False)
-        all_edges['OriginVertex'] = ""
-        all_edges['DestinVertex'] = ""
-        # use edge numbers as index
-        all_edges.set_index('No', inplace=True, verify_integrity=True, drop=True)
+        all_edges = self.visedges
 
         # read each edge into graph, build vertices as we go
         for index in all_edges.index:
@@ -108,20 +89,86 @@ class VissimRoadNet(igraph.Graph):
 
         return all_edges
 
+    @classmethod
+    def read_vissim_net(cls, vissim_net):
+        # read edges into dataframe
+        all_edges = pd.DataFrame(
+            [list(row) for row in vissim_net.Edges.GetMultipleAttributes(cls.VISSIM_Edge_Attributes)],
+            columns=cls.VISSIM_Edge_Attributes
+        )
+        # filter only open dynamic assignment edges
+        all_edges = all_edges[all_edges.Type == 'DYNAMICASSIGNMENT']
+        # properly type cast all the columns
+        all_edges.No = all_edges.No.astype('int32')
+        all_edges.FromNode = all_edges.FromNode.astype('int32')
+        all_edges.ToNode = all_edges.ToNode.astype('int32')
+        all_edges = all_edges.astype({
+            'FromEdges': str,
+            'ToEdges': str,
+            'IsTurn': bool,
+            'Type': 'category',
+            'Closed': bool
+        }, copy=False)
+        all_edges['OriginVertex'] = ""
+        all_edges['DestinVertex'] = ""
+        # use edge numbers as index
+        all_edges.set_index('No', inplace=True, verify_integrity=True, drop=True)
+        return all_edges
+
+    def read_parking_lot(self, vissim_net) -> pd.DataFrame:
+        """
+        This function takes in a VISSIM INet object and returns a table with the parkinglot association to
+        nodes relationship
+        :param vissim_net: VISSIM INet object
+        :return:
+        """
+
+        parking_lots = vissim_net.ParkingLots.GetMultipleAttributes(["No", "Zone", "Type"])
+        parking_lots = pd.DataFrame([list(pk) for pk in parking_lots], columns=["No", "Zone", "Type"])
+        parking_lots = parking_lots[parking_lots["Type"] == 'ZONECONNECTOR']
+        parking_lots["Type"] = "" # switch type to indicate whether the lot is origin or destination
+        parking_lots = parking_lots.set_index('No')
+        parking_lots["Zone"] = parking_lots["Zone"].astype(int)
+        parking_lots["Node"] = 0
+
+        vissim_net.Paths.ReadDynAssignPathFile()
+        paths = vissim_net.Paths.GetMultipleAttributes(['FromParkLot', 'ToParkLot', 'EdgeSeq'])
+        paths = pd.DataFrame([list(p) for p in paths], columns=['FromParkLot', 'ToParkLot', 'EdgeSeq'])
+        paths[['FromParkLot', 'ToParkLot']] = paths[['FromParkLot', 'ToParkLot']].astype(int, copy=False)
+
+        # filter the path list to reduce run time
+        from_lot_paths = paths.drop_duplicates(subset=['FromParkLot'])
+        to_lot_paths = paths.drop_duplicates(subset=['ToParkLot'])
+        for index, path in from_lot_paths.iterrows():
+            first_edges = int(path.EdgeSeq.split(',')[0])
+            first_node = self.visedges.loc[first_edges, 'FromNode']
+            # set origin lot node
+            parking_lots.loc[path.FromParkLot, 'Node'] = first_node
+            parking_lots.loc[path.FromParkLot, 'Type'] = 'origin'
+
+        for index, path in to_lot_paths.iterrows():
+            last_edges = int(path.EdgeSeq.split(',')[-1])
+            last_node = self.visedges.loc[last_edges, 'ToNode']
+            # set destination lot node
+            parking_lots.loc[path.ToParkLot, 'Node'] = last_node
+            parking_lots.loc[path.ToParkLot, 'Type'] = 'destination'
+
+        return parking_lots
+
 
 # Testing code
 if __name__ == "__main__":
     Vissim = com.gencache.EnsureDispatch("Vissim.Vissim")
     from win32com.client import constants as c
 
-    FileName = r"C:\Users\Public\Documents\PTV Vision\PTV Vissim 9\Examples Demo\Urban Freeway Dyn Assign Redmond.US\I405 OD"
+    FileName = r"C:\Users\ITSLab\Documents\Oliver Liang\Urban Freeway Dyn Assign Redmond.US\Vol150per\Vol150per.inpx"
     # FileName = r"E:\Thesis\Inital test network"
-    Vissim.LoadNet(FileName + ".inpx")
+    Vissim.LoadNet(FileName)
     Net = Vissim.Net
     if not Net.DynamicAssignment.CreateGraph(c.CGEdgeTypeDynamicAssignment):
         print("VISSIM Network Graph Creation error")
         exit(1)
 
     road_graph = VissimRoadNet(Net)
-    road_graph.write_svg(r"J:\Thesis\test.svg", width=3000, height=3000)
+    # road_graph.write_svg(r"J:\Thesis\test.svg", width=3000, height=3000)
     Vissim.Exit()
