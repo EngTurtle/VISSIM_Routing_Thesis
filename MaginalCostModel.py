@@ -3,8 +3,22 @@ import numpy as np
 from collections import OrderedDict
 
 
+class EdgeModel:
+    """
+    This class will provide fitting and be a callable object to estimate marginal cost
+    """
 
-class network_model:
+    def __init__(self, data: [pd.DataFrame, None] = None):
+        """7
+        Class init method,
+        :param data:
+        """
+        if data:
+            # Run model fitting algorithm
+            pass
+
+
+class NetworkModel:
     """
     This model fits and computes the travel time and marginal travel time for all edges in a dynamic assignment graph
     for vissim
