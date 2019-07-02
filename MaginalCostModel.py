@@ -15,6 +15,7 @@ class EdgeModel:
         """
         if data:
             # Run model fitting algorithm
+
             pass
 
 
