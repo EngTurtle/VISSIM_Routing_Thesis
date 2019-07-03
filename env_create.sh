@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-conda create -f environment.yml
+conda env create -f environment.yml
 conda activate thesis
 
 jupyter nbextension enable --py --sys-prefix widgetsnbextension

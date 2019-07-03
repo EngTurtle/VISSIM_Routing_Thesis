@@ -5,7 +5,7 @@ channels:
   - vtraag
 dependencies:
   - anaconda
-  - autopep8c
+  - autopep8
   - ipywidgets
   - jupyter_nbextensions_configurator
   - jupyter_contrib_nbextensions
