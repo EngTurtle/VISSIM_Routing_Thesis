@@ -2,6 +2,8 @@ import igraph
 import win32com.client as com
 import pandas as pd
 import itertools
+from typing import Sequence
+from itertools import groupby
 
 
 def read_edges_to_df(visnet):
@@ -18,16 +20,23 @@ class VissimRoadNet(igraph.Graph):
     def __init__(self, net, *args, **kwargs):
         """
         Initializes the VissimRoadNet graph using a VISSIM network
-        :param net:
+        :param net: win32com.gen_py.[VISSIM COM GUID].INet
+
+        VISSIM network object who's dynamic assignment graph will be read
+
         :param args:
         :param kwargs:
+
+        Other arguments will be sent to constructor for parent igraph.Graph class.
         """
         super(VissimRoadNet, self).__init__(directed=True, *args, **kwargs)
         assert type(net).__name__ == "INet"
         self.visedges = self.read_vissim_net(net)
         self.vissim_net_to_igraph()
         self.parking_lots = self.read_parking_lot(net)
-        # TODO get parking lot association to nodes
+
+        # set initial weight value for path search
+        self.es['weight'] = self.visedges['Length'].to_list()
 
     def vissim_net_to_igraph(self):
         """
@@ -42,7 +51,7 @@ class VissimRoadNet(igraph.Graph):
             if not all_edges.loc[index].OriginVertex:  # fresh edge that doesn't have origin vertices assigned
                 # create and add origin vertex to graph
                 vertex_name = 'visnode.' + str(all_edges.loc[index].FromNode) + '.' + str(index)
-                self.add_vertex(name=vertex_name)
+                self.add_vertex(name=vertex_name, node=all_edges.loc[index].FromNode)
 
                 # add this edge's origin vertex as DestinVertex of all edges going into it
                 vertex_enter_edges = all_edges.loc[index].FromEdges
@@ -63,7 +72,7 @@ class VissimRoadNet(igraph.Graph):
             if not all_edges.loc[index].DestinVertex:  # fresh edge that doesn't have destination vertices assigned
                 # create and add destination vertex to graph
                 vertex_name = 'visnode.' + str(all_edges.loc[index].ToNode) + '.' + str(index)
-                self.add_vertex(name=vertex_name)
+                self.add_vertex(name=vertex_name, node=all_edges.loc[index].ToNode)
 
                 # add this edge's destination vertex as OriginVertex of all edges going from it
                 vertex_exit_edges = all_edges.loc[index].ToEdges
@@ -90,7 +99,7 @@ class VissimRoadNet(igraph.Graph):
         return all_edges
 
     @classmethod
-    def read_vissim_net(cls, vissim_net):
+    def read_vissim_net(cls, vissim_net) -> pd.DataFrame:
         # read edges into dataframe
         all_edges = pd.DataFrame(
             [list(row) for row in vissim_net.Edges.GetMultipleAttributes(cls.VISSIM_Edge_Attributes)],
@@ -120,7 +129,7 @@ class VissimRoadNet(igraph.Graph):
         This function takes in a VISSIM INet object and returns a table with the parkinglot association to
         nodes relationship
         :param vissim_net: VISSIM INet object
-        :return:
+        :return: Dataframe with parking lot number, zone number, and node number
         """
 
         parking_lots = vissim_net.ParkingLots.GetMultipleAttributes(["No", "Zone", "Type"])
@@ -130,6 +139,7 @@ class VissimRoadNet(igraph.Graph):
         parking_lots = parking_lots.set_index('No')
         parking_lots["Zone"] = parking_lots["Zone"].astype(int)
         parking_lots["Node"] = 0
+        parking_lots["VertexName"] = ''
 
         vissim_net.Paths.ReadDynAssignPathFile()
         paths = vissim_net.Paths.GetMultipleAttributes(['FromParkLot', 'ToParkLot', 'EdgeSeq'])
@@ -140,20 +150,43 @@ class VissimRoadNet(igraph.Graph):
         from_lot_paths = paths.drop_duplicates(subset=['FromParkLot'])
         to_lot_paths = paths.drop_duplicates(subset=['ToParkLot'])
         for index, path in from_lot_paths.iterrows():
-            first_edges = int(path.EdgeSeq.split(',')[0])
-            first_node = self.visedges.loc[first_edges, 'FromNode']
+            first_edge = int(path.EdgeSeq.split(',')[0])
+            first_node = self.visedges.loc[first_edge, 'FromNode']
+            first_vertex = self.visedges.loc[first_edge, 'OriginVertex']
             # set origin lot node
             parking_lots.loc[path.FromParkLot, 'Node'] = first_node
+            parking_lots.loc[path.FromParkLot, 'VertexName'] = first_vertex
             parking_lots.loc[path.FromParkLot, 'Type'] = 'origin'
 
         for index, path in to_lot_paths.iterrows():
-            last_edges = int(path.EdgeSeq.split(',')[-1])
-            last_node = self.visedges.loc[last_edges, 'ToNode']
+            last_edge = int(path.EdgeSeq.split(',')[-1])
+            last_node = self.visedges.loc[last_edge, 'ToNode']
+            last_vertex = self.visedges.loc[last_edge, 'DestinVertex']
             # set destination lot node
             parking_lots.loc[path.ToParkLot, 'Node'] = last_node
+            parking_lots.loc[path.ToParkLot, 'VertexName'] = last_vertex
             parking_lots.loc[path.ToParkLot, 'Type'] = 'destination'
 
         return parking_lots
+
+    def parking_lot_route(self, origin_lot: int, destination_lot: int) -> Sequence[int]:
+        """
+        This function computes the least costly path from one parking lot to another
+        :param origin_lot: The origin parking lot number as defined in VISSIM
+        :param destination_lot: The destination parking lot number as defined in VISSIM
+        :return: sequence of node numbers as a list
+        """
+
+        origin_vertex = self.parking_lots.loc[origin_lot, 'VertexName']
+        destination_vertex = self.parking_lots.loc[destination_lot, 'VertexName']
+        vertex_seq = self.get_shortest_paths(v=origin_vertex,
+                                             to=destination_vertex,
+                                             weights='weight',
+                                             output='vpath')
+        node_seq = [self.vs[vertex]['node'] for vertex in vertex_seq[0]]
+        # remove consecutive duplicate nodes
+        node_seq = [node[0] for node in groupby(node_seq)]
+        return node_seq
 
 
 # Testing code
