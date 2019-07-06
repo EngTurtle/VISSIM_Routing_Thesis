@@ -2,12 +2,29 @@ import igraph
 import win32com.client as com
 import pandas as pd
 import itertools
-from typing import Sequence
+from typing import Sequence, List
 from itertools import groupby
 
 
-def read_edges_to_df(visnet):
-    pass
+def remove_loops(sequence: List[int]) -> List[int]:
+    """
+    This function takes in a list of numbers, finds any with duplicates, and all longest sequence between duplicates
+    :param sequence:
+    :return: list of numbers
+    """
+    # make list copy
+    sequence = [item for item in sequence]
+
+    item_set = set(sequence)
+    if len(sequence) != len(item_set):
+        for item in item_set:
+            if sequence.count(item) > 1:
+                last_index = sequence[::-1].index(item)
+                first_index = sequence.index(item)
+                del sequence[first_index+1:last_index*-1]
+
+    return sequence
+
 
 
 class VissimRoadNet(igraph.Graph):
@@ -60,14 +77,10 @@ class VissimRoadNet(igraph.Graph):
                     all_edges.loc[vertex_enter_edges, 'DestinVertex'] = vertex_name
                     # add the vertex to the OriginVertex of other edges going to the same edges
                     vertex_exit_edges = [ed.split(',') for ed in all_edges.loc[vertex_enter_edges].ToEdges]
-                    vertex_exit_edges = [int(ed) for ed in itertools.chain.from_iterable(vertex_exit_edges)]
+                    vertex_exit_edges = [int(ed) for ed in itertools.chain.from_iterable(vertex_exit_edges) if ed]
                     all_edges.loc[vertex_exit_edges, 'OriginVertex'] = vertex_name
-                else:  # add vertex to all edges going directly to and from node
-                    from_node = all_edges.loc[index].FromNode
-                    all_edges.loc[(all_edges['FromNode'] == from_node) & (all_edges['FromEdges'] == ""),
-                                  'OriginVertex'] = vertex_name
-                    all_edges.loc[(all_edges['ToNode'] == from_node) & (all_edges['ToEdges'] == ""),
-                                  'DestinVertex'] = vertex_name
+                else:  # add vertex only to this edge
+                    all_edges.loc[index, 'OriginVertex'] = vertex_name
 
             if not all_edges.loc[index].DestinVertex:  # fresh edge that doesn't have destination vertices assigned
                 # create and add destination vertex to graph
@@ -81,14 +94,10 @@ class VissimRoadNet(igraph.Graph):
                     all_edges.loc[vertex_exit_edges, 'OriginVertex'] = vertex_name
                     # add the vertex to the DestinVertex of other edges coming from the same edges
                     vertex_enter_edges = [ed.split(',') for ed in all_edges.loc[vertex_exit_edges].FromEdges]
-                    vertex_enter_edges = [int(ed) for ed in itertools.chain.from_iterable(vertex_enter_edges)]
+                    vertex_enter_edges = [int(ed) for ed in itertools.chain.from_iterable(vertex_enter_edges) if ed]
                     all_edges.loc[vertex_enter_edges, 'DestinVertex'] = vertex_name
-                else:  # add vertex to all edges going directly to and from node
-                    to_node = all_edges.loc[index].ToNode
-                    all_edges.loc[(all_edges['FromNode'] == to_node) & (all_edges['FromEdges'] == ""),
-                                  'OriginVertex'] = vertex_name
-                    all_edges.loc[(all_edges['ToNode'] == to_node) & (all_edges['ToEdges'] == ""),
-                                  'DestinVertex'] = vertex_name
+                else:  # add vertex only to this edge
+                    all_edges.loc[index, 'DestinVertex'] = vertex_name
 
             # add this edge to the graph
             # if not all_edges.loc[index, 'Closed']: # TODO apply closed status during edge cost analysis
@@ -182,8 +191,9 @@ class VissimRoadNet(igraph.Graph):
         vertex_seq = self.get_shortest_paths(v=origin_vertex,
                                              to=destination_vertex,
                                              weights='weight',
-                                             output='vpath')
-        node_seq = [self.vs[vertex]['node'] for vertex in vertex_seq[0]]
+                                             output='vpath')[0]
+        node_seq = [self.vs[vertex]['node'] for vertex in vertex_seq]
+
         # remove consecutive duplicate nodes
         node_seq = [node[0] for node in groupby(node_seq)]
         return node_seq
