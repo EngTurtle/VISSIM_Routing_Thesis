@@ -1,9 +1,11 @@
 import igraph
 import win32com.client as com
 import pandas as pd
+import numpy as np
 import itertools
-from typing import Sequence, List
+from typing import Sequence, List, Tuple
 from itertools import groupby
+from math import ceil
 
 
 def remove_loops(sequence: List[int]) -> List[int]:
@@ -21,10 +23,9 @@ def remove_loops(sequence: List[int]) -> List[int]:
             if sequence.count(item) > 1:
                 last_index = sequence[::-1].index(item)
                 first_index = sequence.index(item)
-                del sequence[first_index+1:last_index*-1]
+                del sequence[first_index + 1:last_index * -1]
 
     return sequence
-
 
 
 class VissimRoadNet(igraph.Graph):
@@ -34,7 +35,7 @@ class VissimRoadNet(igraph.Graph):
     VISSIM_Edge_Attributes = ['No', 'FromNode', 'ToNode', 'FromEdges', 'ToEdges', 'LinkSeq', 'Length', 'IsTurn', 'Type',
                               'Closed']
 
-    def __init__(self, net, *args, **kwargs):
+    def __init__(self, net=None, edge_ff='edge_free_flow.pkl.gz', *args, **kwargs):
         """
         Initializes the VissimRoadNet graph using a VISSIM network
         :param net: win32com.gen_py.[VISSIM COM GUID].INet
@@ -47,18 +48,28 @@ class VissimRoadNet(igraph.Graph):
         Other arguments will be sent to constructor for parent igraph.Graph class.
         """
         super(VissimRoadNet, self).__init__(directed=True, *args, **kwargs)
-        assert type(net).__name__ == "INet"
-        self.visedges = self.read_vissim_net(net)
-        self.vissim_net_to_igraph()
-        self.parking_lots = self.read_parking_lot(net)
+        if type(net).__name__ == "INet":
+            self.visedges = self.read_vissim_net(net)
+            self.vissim_net_to_igraph()
+            self.parking_lots = self.read_parking_lot(net)
 
-        # set initial weight value for path search
-        self.es['weight'] = self.visedges['Length'].to_list()
+            # set initial edge volume
+            self.edge_volume = pd.Series(0, index=self.visedges.index, dtype=int)
+            self.veh_paths = {}
+            self.edge_ff = pd.read_pickle(edge_ff)
+            self._traveltime = pd.Series(pd.np.nan, index=self.visedges.index, dtype=float)
+            self._traveltime.loc[self.edge_ff.index] = self.edge_ff['TravelTime mean']
+            empty_traveltime = self._traveltime.index[self._traveltime.isna()]
+            self._traveltime.loc[empty_traveltime] = self.visedges.loc[empty_traveltime, 'Length'] / 51.3333  # ft/s
+            self._traveltimeperiod = 1
+            # or 35 mph
+
+            # set initial weight value for path search
+            self.es['weight'] = self._traveltime.to_list()
 
     def vissim_net_to_igraph(self):
         """
         This function takes in a VISSIM network COM object, then reads it and converts it to a VissimRoadNet object
-        :param vissim_net: win32com.gen_py.[VISSIM COM GUID].INet
         """
 
         all_edges = self.visedges
@@ -144,7 +155,7 @@ class VissimRoadNet(igraph.Graph):
         parking_lots = vissim_net.ParkingLots.GetMultipleAttributes(["No", "Zone", "Type"])
         parking_lots = pd.DataFrame([list(pk) for pk in parking_lots], columns=["No", "Zone", "Type"])
         parking_lots = parking_lots[parking_lots["Type"] == 'ZONECONNECTOR']
-        parking_lots["Type"] = "" # switch type to indicate whether the lot is origin or destination
+        parking_lots["Type"] = ""  # switch type to indicate whether the lot is origin or destination
         parking_lots = parking_lots.set_index('No')
         parking_lots["Zone"] = parking_lots["Zone"].astype(int)
         parking_lots["Node"] = 0
@@ -178,9 +189,11 @@ class VissimRoadNet(igraph.Graph):
 
         return parking_lots
 
-    def parking_lot_route(self, origin_lot: int, destination_lot: int) -> Sequence[int]:
+    def parking_lot_routes(self,
+                          origin_lot: (int, Sequence[int]),
+                          destination_lot: (int, Sequence[int])) -> Tuple[list, list]:
         """
-        This function computes the least costly path from one parking lot to another
+        This function computes the least costly path(s) between parking lot pair(s)
         :param origin_lot: The origin parking lot number as defined in VISSIM
         :param destination_lot: The destination parking lot number as defined in VISSIM
         :return: sequence of node numbers as a list
@@ -188,15 +201,66 @@ class VissimRoadNet(igraph.Graph):
 
         origin_vertex = self.parking_lots.loc[origin_lot, 'VertexName']
         destination_vertex = self.parking_lots.loc[destination_lot, 'VertexName']
-        vertex_seq = self.get_shortest_paths(v=origin_vertex,
-                                             to=destination_vertex,
-                                             weights='weight',
-                                             output='vpath')[0]
-        node_seq = [self.vs[vertex]['node'] for vertex in vertex_seq]
+        edge_ind_seqs = self.get_shortest_paths(v=origin_vertex,
+                                                to=destination_vertex,
+                                                weights='weight',
+                                                output='epath')
+
+        edge_seqs = [self.es[edge_seq] for edge_seq in edge_ind_seqs]
+
+        node_seqs = [[self.vs[edge.target]['node'] for edge in edge_seq[:-1]] for edge_seq in edge_seqs]
 
         # remove consecutive duplicate nodes
-        node_seq = [node[0] for node in groupby(node_seq)]
-        return node_seq
+        node_seqs = [[node[0] for node in groupby(node_seq)] for node_seq in node_seqs]
+
+        edge_no_seqs = [self.visedges.index[edge_ind_seq] for edge_ind_seq in edge_ind_seqs]
+        return node_seqs, edge_no_seqs
+
+    def add_volume(self, edge_no_seq: Sequence[int]) -> None:
+        """
+        This function takes in a list of edge no sequence paths and add to their volume counts
+        :param edge_no_seq:
+        :return:
+        """
+        self.edge_volume.loc[edge_no_seq] = self.edge_volume.loc[edge_no_seq] + 1
+
+    def remove_volume(self, edge_no_seq: Sequence[int]) -> None:
+        """
+        This function takes in a list of edge no sequence paths and removes from their volume counts
+        :param edge_no_seq:
+        :return:
+        """
+        self.edge_volume.loc[edge_no_seq] = self.edge_volume.loc[edge_no_seq] - 1
+        self.edge_volume.clip_lower(0, inplace=True)
+
+    def update_volume(self, vis_net):
+        new_vehs = vis_net.Vehicles.GetDeparted().GetAll()
+        for veh in new_vehs:
+            new_path = [int(edge) for edge in veh.Path.AttValue('EdgeSeq').split(',')]
+            self.veh_paths[veh.AttValue('No')] = new_path
+            self.add_volume(new_path)
+
+        departed_vehs = vis_net.Vehicles.GetArrived().GetAll()
+        for veh in departed_vehs:
+            old_path = self.veh_paths[veh.AttValue('No')]
+            self.remove_volume(old_path)
+
+    def update_weights(self, vis_net):
+        current_DTA_period = ceil(vis_net.Simulation.SimulationSecond / vis_net.DynamicAssignment.AttValue('EvalInt'))
+        # update recorded travel time
+        if current_DTA_period > self._traveltimeperiod:
+            new_travel_times = vis_net.Edges.GetMultiAttValues(f'TravTmRaw({current_DTA_period - 1})')
+            # remove edges without recorded travel time
+            new_travel_times = [edge for edge in new_travel_times if edge[1]]
+            index, new_travel_times = tuple(zip(*new_travel_times))
+            self._traveltime.loc[index] = list(new_travel_times)
+            self._traveltimeperiod = current_DTA_period
+            # increase travel time for closed edges
+            closed_edges = self.visedges['Closed'].astype(bool)
+            self._traveltime.loc[closed_edges] = 99999
+
+            # TODO change weights to travel time plus marginal cost instead of just travel time
+            self.es['weight'] = self._traveltime.to_list()
 
 
 # Testing code
@@ -215,3 +279,4 @@ if __name__ == "__main__":
     road_graph = VissimRoadNet(Net)
     # road_graph.write_svg(r"J:\Thesis\test.svg", width=3000, height=3000)
     Vissim.Exit()
+    com.dynamic.
