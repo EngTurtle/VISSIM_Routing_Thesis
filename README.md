@@ -22,3 +22,16 @@ The results of this research will help predict the effect of ride sharing and au
 | [6] | SAE International, Taxonomy and Definitions for Terms Related to Driving Automation Systems for On-Road Motor Vehicles, SAE International, 2018.  |
 | [7] | H. . Yang and Q. . Meng, "Departure time, route choice and congestion toll in a queuing network with elastic demand," Transportation Research Part B-methodological, vol. 32, no. 4, pp. 247-260, 1998.  |
 
+Copyright 2021 Oliver Liang
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
